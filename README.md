@@ -1,2 +1,2 @@
-# EffCom
-Algorithms for two agents effective communication problems
+# EffCom - Effective Communication
+Algorithms for two agents effective communication problems. 
