@@ -4,6 +4,7 @@ from EffCom.algorithms.BaseAlgorithm import RL_Algorithm
 from EffCom.algorithms.push.POMDP_model import POMDP_model
 from julia import NativeSARSOP, POMDPs
 
+
 class POMDP_solver(RL_Algorithm):
     def __init__(self, mdp: MDP):
         self.mdp = mdp
@@ -20,7 +21,7 @@ class POMDP_solver(RL_Algorithm):
                                             precision  = 0.0001,
                                             kappa      = 0.5,
                                             delta      = 0.0001,
-                                            max_time   = 40.0     )
+                                            max_time   = 60.0     )
 
         # train model
         policy_JuliaObj = POMDPs.solve(solver, POMDP_interface) 
@@ -52,6 +53,7 @@ class POMDP_solver(RL_Algorithm):
             state = np.random.choice(np.arange(self.n_states), p=self.mdp.P[action,state])
 
             total_reward = 0
+            total_raw_reward = 0
             total_reward_undiscounted = 0
             total_ch_uti = 0
             for t in range(horizon):
@@ -66,6 +68,7 @@ class POMDP_solver(RL_Algorithm):
                 reward = self.mdp.R[state, action]
                 combined_reward = reward - transmission_cost
                 total_reward += (self.mdp.gamma ** t) * combined_reward 
+                total_raw_reward += reward
                 total_reward_undiscounted += combined_reward
                 total_ch_uti += int(message is not None) / horizon
 
@@ -73,6 +76,7 @@ class POMDP_solver(RL_Algorithm):
                 state = np.random.choice(np.arange(self.n_states), p=self.mdp.P[action,state])
 
             print(total_reward)
+            print(total_raw_reward)
             print(total_reward_undiscounted)
             print(total_ch_uti)
 
@@ -143,7 +147,7 @@ def update_b(b, a_tx, a_rx, o, n_states, P):
 
 def get_action(b, alpha_vectors, action_map, n_states, n_actions, POMDP_model, gamma):
     assert np.shape(b) == (n_states, 1)
-    # T = POMDP_model.T
+    # T = np.transpose(POMDP_model.P, (2,1,0))
     # nA = (2 ** n_states) * n_actions
     # Q = np.zeros((nA, 1))
     # for a in range(nA):
