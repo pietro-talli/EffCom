@@ -1,12 +1,13 @@
 import numpy as np
 from EffCom.mdp import MDP
 from EffCom.algorithms.BaseAlgorithm import RL_Algorithm
-from POMDP_model import POMDP_model
+from EffCom.algorithms.push.POMDP_model import POMDP_model
 from julia import NativeSARSOP, POMDPs
 
-class PODMP_solver(RL_Algorithm):
+class POMDP_solver(RL_Algorithm):
     def __init__(self, mdp: MDP):
         self.mdp = mdp
+        self.mdp.R = np.sum(self.mdp.R * self.mdp.P, axis=2) # (a,s,s_new)
         self.n_states = mdp.n_states
 
     def run(self, beta):
@@ -25,7 +26,7 @@ class PODMP_solver(RL_Algorithm):
         policy_JuliaObj = POMDPs.solve(solver, POMDP_interface) 
 
         # extract value function vectors and action map
-        alpha_vectors = np.array(policy_JuliaObj.alpha)
+        alpha_vectors = np.array(policy_JuliaObj.alphas)
         action_map = policy_JuliaObj.action_map
 
         # create auxiliary functions
@@ -36,21 +37,23 @@ class PODMP_solver(RL_Algorithm):
     def eval_perf(self, horizon, n_episodes):
         for episode in range(n_episodes):
             # declare agent objects
-            sensor = Sensor(self.best_action, self.best_actionupdate_b)
-            actuator = Actuator(self.best_action, self.best_actionupdate_b)
+            sensor = Sensor(self.n_states, self.best_action, self.update_b)
+            actuator = Actuator(self.n_states, self.best_action, self.update_b)
 
             # set initial state
             b0 = np.zeros((self.mdp.n_states,))
-            b0[0,0] = 1
+            b0[0] = 1
             print("WARNING: initial condition is hard coded to be that the initial state is always 0")
-            state = np.random.choices(np.arange(self.n_states), p=b0)
+            state = np.random.choice(np.arange(self.n_states), p=b0)
 
             # run one step to initialize the beliefs
             message = sensor.step(state)
             action = actuator.step(message)
-            state = np.random.choices(np.arange(self.n_states), p=self.mdp.P[action,state])
+            state = np.random.choice(np.arange(self.n_states), p=self.mdp.P[action,state])
 
             total_reward = 0
+            total_reward_undiscounted = 0
+            total_ch_uti = 0
             for t in range(horizon):
                 message = sensor.step(state)
                 if message is None:
@@ -62,19 +65,24 @@ class PODMP_solver(RL_Algorithm):
                 # Get reward and add to total
                 reward = self.mdp.R[state, action]
                 combined_reward = reward - transmission_cost
-                total_reward += (self.gamma ** t) * combined_reward 
+                total_reward += (self.mdp.gamma ** t) * combined_reward 
+                total_reward_undiscounted += combined_reward
+                total_ch_uti += int(message is not None) / horizon
 
                 # Step into new time-step
-                state = np.random.choices(np.arange(self.n_states), p=self.mdp.P[action,state])
+                state = np.random.choice(np.arange(self.n_states), p=self.mdp.P[action,state])
 
             print(total_reward)
+            print(total_reward_undiscounted)
+            print(total_ch_uti)
 
 
 class Sensor:
-    def __init__(self, best_action, update_b):
+    def __init__(self, n_states, best_action, update_b):
         self.first = True
         self.best_action = best_action
         self.update_b = update_b
+        self.n_s = n_states
       
     def step(self, s):
         self.s = s # observe the state
@@ -99,10 +107,11 @@ class Sensor:
 
 
 class Actuator: 
-    def __init__(self, best_action, update_b):
+    def __init__(self, n_states, best_action, update_b):
         self.first = True
         self.best_action = best_action
         self.update_b = update_b
+        self.n_s = n_states
 
     def step(self, y):
         if self.first:
