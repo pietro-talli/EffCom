@@ -15,7 +15,7 @@ class POMDP_model():
         self.t_cost = t_cost
 
     def decode_action(self, a):
-        """The POMDP actions are in the form (0/1,0/1,...,0/1,0/1/2/3/../n_actions-1), where the last element is the
+        """The POMDP actions are in the form (0/1, 0/1, ..., 0/1, 0/1/2/3/../n_actions-1), where the last element is the
         action taken by the receiver and the first ones are the decision rule of the transmitter."""
         a_tx = a // self.n_actions
         string_representation_of_a_tx = f'{a_tx:0{self.n_states}b}' 
@@ -43,6 +43,8 @@ class POMDP_model():
     
     def get_interface(self):
         """Define the POMDP using the interface required by NativeSARSOP."""
+        if not np.all(np.isclose(np.sum(self.P, axis=2), 1.0)):
+            raise Exception("2nd axis of P does not sum to 1")
         out = DiscreteExplicitPOMDP( range(self.n_states), # state space
                                      range((2 ** self.n_states) * self.n_actions), # action space
                                      range(self.n_states + 1), # observation space

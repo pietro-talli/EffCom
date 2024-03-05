@@ -1,6 +1,6 @@
 {
     "mdp": {
-        "N_states": 30,
+        "N_states": 5,
         "N_actions": 4,
         "gamma": 0.9,
         "r_seed": 1234,

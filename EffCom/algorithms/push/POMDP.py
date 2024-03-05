@@ -8,13 +8,15 @@ from julia import NativeSARSOP, POMDPs
 class POMDP_solver(RL_Algorithm):
     def __init__(self, mdp: MDP):
         self.mdp = mdp
-        self.mdp.R = np.sum(self.mdp.R * self.mdp.P, axis=2) # (a,s,s_new)
+        self.mdp.R = np.sum(self.mdp.R * self.mdp.P, axis=2).T # (a,s,s_new)
         self.n_states = mdp.n_states
 
     def run(self, beta):
         self.beta = beta # MAYBE NOT THE BEST WAY
 
         # create the POMDP interface and declare the solver
+        if not np.all(np.isclose(np.sum(self.mdp.P, axis=2), 1.0)):
+            raise Exception("2nd axis of P does not sum to 1")
         self.POMDP_model = POMDP_model(self.mdp, beta)
         POMDP_interface = self.POMDP_model.get_interface()
         solver = NativeSARSOP.SARSOPSolver( epsilon    = 0.01,
@@ -41,7 +43,7 @@ class POMDP_solver(RL_Algorithm):
         tot_total_raw_reward = 0
         tot_total_reward_undiscounted = 0
         tot_total_ch_uti = 0
-        AoIs = [] * self.n_states
+        AoIs = [[]] * self.n_states
 
         for episode in range(n_episodes):
             # declare agent objects
@@ -97,18 +99,12 @@ class POMDP_solver(RL_Algorithm):
             tot_total_reward_undiscounted += (total_reward_undiscounted / n_episodes)
             tot_total_ch_uti += (total_ch_uti / n_episodes)
 
-        print(tot_total_reward)
-        print(tot_total_raw_reward)
-        print(tot_total_reward_undiscounted)
-        print(tot_total_ch_uti)
+        # print(tot_total_reward)
+        # print(tot_total_raw_reward)
+        # print(tot_total_reward_undiscounted)
+        # print(tot_total_ch_uti)
 
-        tot_total_reward = 0
-        tot_total_raw_reward = 0
-        tot_total_reward_undiscounted = 0
-        tot_total_ch_uti = 0
-        AoIs = [] * self.n_states
-
-        return tot_total_reward, tot_total_raw_reward, tot_total_reward_undiscounted, tot_total_ch_uti
+        return tot_total_reward, tot_total_raw_reward, tot_total_reward_undiscounted, tot_total_ch_uti, AoIs
 
 
 class Sensor:

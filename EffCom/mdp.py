@@ -82,5 +82,12 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
              
             for i in range(N_states):
                 m.R[:,:,i] = 10*np.exp(-np.abs(i-optimal_state)*reward_decay)
+
+    for mdp in mdp_list:
+        assert np.all(mdp.P > 0)
+        assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
+        if not np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0)):#, rtol=0.1,atol=0.1)):
+            print(mdp.P)
+            assert False
         
     return mdp_list
