@@ -17,11 +17,12 @@ class POMDP_solver(RL_Algorithm):
         # create the POMDP interface and declare the solver
         self.POMDP_model = POMDP_model(self.mdp, beta)
         POMDP_interface = self.POMDP_model.get_interface()
-        solver = NativeSARSOP.SARSOPSolver( epsilon    = 0.00001,
-                                            precision  = 0.0001,
+        solver = NativeSARSOP.SARSOPSolver( epsilon    = 0.01,
+                                            precision  = 0.01,
                                             kappa      = 0.5,
                                             delta      = 0.0001,
-                                            max_time   = 60.0     )
+                                            max_time   = 300.0,  
+                                            verbose    = False   )
 
         # train model
         policy_JuliaObj = POMDPs.solve(solver, POMDP_interface) 
@@ -36,6 +37,11 @@ class POMDP_solver(RL_Algorithm):
 
 
     def eval_perf(self, horizon, n_episodes):
+        tot_total_reward = 0
+        tot_total_raw_reward = 0
+        tot_total_reward_undiscounted = 0
+        tot_total_ch_uti = 0
+
         for episode in range(n_episodes):
             # declare agent objects
             sensor = Sensor(self.n_states, self.best_action, self.update_b)
@@ -56,6 +62,7 @@ class POMDP_solver(RL_Algorithm):
             total_raw_reward = 0
             total_reward_undiscounted = 0
             total_ch_uti = 0
+            AoI = 0
             for t in range(horizon):
                 message = sensor.step(state)
                 if message is None:
@@ -75,10 +82,16 @@ class POMDP_solver(RL_Algorithm):
                 # Step into new time-step
                 state = np.random.choice(np.arange(self.n_states), p=self.mdp.P[action,state])
 
-            print(total_reward)
-            print(total_raw_reward)
-            print(total_reward_undiscounted)
-            print(total_ch_uti)
+            # Add results to total averages
+            tot_total_reward += (total_reward / n_episodes)
+            tot_total_raw_reward += (total_raw_reward / n_episodes)
+            tot_total_reward_undiscounted += (total_reward_undiscounted / n_episodes)
+            tot_total_ch_uti += (total_ch_uti / n_episodes)
+
+        print(tot_total_reward)
+        print(tot_total_raw_reward)
+        print(tot_total_reward_undiscounted)
+        print(tot_total_ch_uti)
 
 
 class Sensor:

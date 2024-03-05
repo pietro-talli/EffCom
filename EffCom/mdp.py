@@ -18,7 +18,9 @@ class MDP:
     '''
     def __init__(self, n_states: int, n_actions: int, P: np.ndarray, R: np.ndarray, gamma: float = 0.99):
         self.n_states = n_states
+        self.N_s = n_states
         self.n_actions = n_actions
+        self.N_a = n_actions
         self.gamma = gamma
         assert P.shape == (n_actions, n_states, n_states), f'P.shape = {P.shape}, expected {(n_actions, n_states, n_states)}'
         self.P = P

@@ -103,7 +103,7 @@ class RemotePolicyIteration(RL_Algorithm):
         for s in range(self.mdp.N_s):
             belief = np.zeros(self.mdp.N_s)
             belief[s] = 1
-            for t in range(self.t_max):
+            for t in range(min(self.t_max, self.H)):
                 # Update the policy for the MDP action
                 old_action = self.pi_actuator[s,t]
                 values = np.zeros(self.mdp.N_a)
@@ -128,7 +128,7 @@ class RemotePolicyIteration(RL_Algorithm):
                 for s_curr in range(self.mdp.N_s):
                     old_c = self.pi_sensor[s,t,s_curr]
 
-                    if t == self.t_max-1:
+                    if t == self.t_max-1 or t == self.H - 1:
                         self.pi_sensor[s,t,s_curr] = 1
                     else:
                         values = np.zeros(2)
