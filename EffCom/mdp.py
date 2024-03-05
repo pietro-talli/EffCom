@@ -68,13 +68,17 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
             mdp_list[0].P[a][s][random_idx] = 1
 
             for i in range(1, int(N_states/2)):
+                offsets = [j for j in range(-i, i+1)]
                 new_link_set = [(random_idx + j) % N_states for j in range(-i, i+1)]
                 mdp_list[i].P[a][s] = np.zeros(N_states)
-                for idx in new_link_set:
-                    mdp_list[i].P[a][s][idx] = 0.5 - np.abs(idx)/len(new_link_set)
+                for offset,idx in zip(offsets, new_link_set):
+                    mdp_list[i].P[a][s][idx] = 0.5 - np.abs(offset)/len(new_link_set)
 
                 mdp_list[i].P[a,s,random_idx] += 0.1
                 mdp_list[i].P[a,s,:] /= np.sum(mdp_list[i].P[a,s,:])
+                if not np.all(mdp_list[i].P[a,s,:] >= 0):
+                    print(mdp_list[i].P[a,s,:])
+                    assert False
 
         for idx, m in enumerate(mdp_list):
             m.R = mdp_list[0].R 
@@ -84,7 +88,6 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
                 m.R[:,:,i] = 10*np.exp(-np.abs(i-optimal_state)*reward_decay)
 
     for mdp in mdp_list:
-        assert np.all(mdp.P > 0)
         assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
         if not np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0)):#, rtol=0.1,atol=0.1)):
             print(mdp.P)
