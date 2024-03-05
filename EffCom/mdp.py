@@ -49,10 +49,12 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
         List of random MDPs
     """
     # set the seed to do the same experiments with different communication costs
+    print(N_states, N_actions, gamma, r_seed, reward_decay)
+
     np.random.seed(r_seed)
 
     # create a list of MDPs
-    mdp_list = [MDP(N_states, N_actions,np.zeros(N_actions, N_states, N_states), np.zeros(N_actions, N_states, N_states), gamma) for _ in range(int(N_states/2))]
+    mdp_list = [MDP(N_states, N_actions,np.zeros((N_actions, N_states, N_states)), np.zeros((N_actions, N_states, N_states)), gamma) for _ in range(int(N_states/2))]
 
     optimal_state = np.random.randint(0,N_states)
 
