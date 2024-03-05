@@ -41,6 +41,7 @@ class POMDP_solver(RL_Algorithm):
         tot_total_raw_reward = 0
         tot_total_reward_undiscounted = 0
         tot_total_ch_uti = 0
+        AoIs = [] * self.n_states
 
         for episode in range(n_episodes):
             # declare agent objects
@@ -62,13 +63,21 @@ class POMDP_solver(RL_Algorithm):
             total_raw_reward = 0
             total_reward_undiscounted = 0
             total_ch_uti = 0
-            AoI = 0
+            current_AoI = 0
+            active_state = 0
             for t in range(horizon):
                 message = sensor.step(state)
                 if message is None:
                     transmission_cost = 0
+                    if current_AoI > 0: # current AoI is only 0 when no message has occurred yet (we use this to prevent a false value at the start)
+                        current_AoI += 1
                 else:
                     transmission_cost = self.beta
+                    if current_AoI > 0:
+                        AoIs[active_state].append(current_AoI)
+                    current_AoI = 1
+                    active_state = message
+
                 action = actuator.step(message)
 
                 # Get reward and add to total
@@ -92,6 +101,14 @@ class POMDP_solver(RL_Algorithm):
         print(tot_total_raw_reward)
         print(tot_total_reward_undiscounted)
         print(tot_total_ch_uti)
+
+        tot_total_reward = 0
+        tot_total_raw_reward = 0
+        tot_total_reward_undiscounted = 0
+        tot_total_ch_uti = 0
+        AoIs = [] * self.n_states
+
+        return tot_total_reward, tot_total_raw_reward, tot_total_reward_undiscounted, tot_total_ch_uti
 
 
 class Sensor:
