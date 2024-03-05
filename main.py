@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
         for beta in betas:
             pomdp.run(beta)
-            tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_ch_uti, AoIs = pomdp.eval_perf(horizon, runs_per_instance)
+            tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, AoIs = pomdp.eval_perf(horizon, runs_per_instance)
 
             policy_iteration.run(beta)
             r,c = policy_iteration.eval_perf(runs_per_instance)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
                 pickle.dump(aois_policy_iteration, f)
             with open("{}/{}_results.csv".format(mdp_folder,str(mdp_i)), mode='a', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_ch_uti, r, c])
+                writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, r, c])
 
         mdp_csv = "{}/{}".format(mdp_folder,str(mdp_i))
 

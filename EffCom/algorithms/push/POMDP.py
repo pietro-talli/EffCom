@@ -42,6 +42,7 @@ class POMDP_solver(RL_Algorithm):
         tot_total_reward = 0
         tot_total_raw_reward = 0
         tot_total_reward_undiscounted = 0
+        tot_total_raw_reward_undiscounted = 0
         tot_total_ch_uti = 0
         AoIs = [[]] * self.n_states
 
@@ -64,6 +65,7 @@ class POMDP_solver(RL_Algorithm):
             total_reward = 0
             total_raw_reward = 0
             total_reward_undiscounted = 0
+            total_raw_reward_undiscounted = 0
             total_ch_uti = 0
             current_AoI = 0
             active_state = 0
@@ -85,9 +87,10 @@ class POMDP_solver(RL_Algorithm):
                 # Get reward and add to total
                 reward = self.mdp.R[state, action]
                 combined_reward = reward - transmission_cost
-                total_reward += (self.mdp.gamma ** t) * combined_reward 
-                total_raw_reward += reward
-                total_reward_undiscounted += combined_reward
+                total_reward += (self.mdp.gamma ** t) * combined_reward / horizon
+                total_raw_reward += reward / horizon
+                total_reward_undiscounted += combined_reward / horizon
+                total_raw_reward_undiscounted += reward / horizon
                 total_ch_uti += int(message is not None) / horizon
 
                 # Step into new time-step
@@ -97,6 +100,7 @@ class POMDP_solver(RL_Algorithm):
             tot_total_reward += (total_reward / n_episodes)
             tot_total_raw_reward += (total_raw_reward / n_episodes)
             tot_total_reward_undiscounted += (total_reward_undiscounted / n_episodes)
+            tot_total_raw_reward_undiscounted += (total_raw_reward_undiscounted / n_episodes)
             tot_total_ch_uti += (total_ch_uti / n_episodes)
 
         # print(tot_total_reward)
@@ -104,7 +108,7 @@ class POMDP_solver(RL_Algorithm):
         # print(tot_total_reward_undiscounted)
         # print(tot_total_ch_uti)
 
-        return tot_total_reward, tot_total_raw_reward, tot_total_reward_undiscounted, tot_total_ch_uti, AoIs
+        return tot_total_reward, tot_total_raw_reward, tot_total_reward_undiscounted, tot_total_raw_reward_undiscounted, tot_total_ch_uti, AoIs
 
 
 class Sensor:
@@ -172,42 +176,11 @@ def update_b(b, a_tx, a_rx, o, n_states, P):
 
 
 def get_action(b, alpha_vectors, action_map, n_states, n_actions, POMDP_model, gamma):
-    assert np.shape(b) == (n_states, 1)
-    # T = np.transpose(POMDP_model.P, (2,1,0))
-    # nA = (2 ** n_states) * n_actions
-    # Q = np.zeros((nA, 1))
-    # for a in range(nA):
-    #     a_tx = a // n_states
-    #     string_representation_of_a_tx = f'{a_tx:0{n_states}b}' 
-    #     a_tx = np.array([int(bit) for bit in string_representation_of_a_tx])
-    #     r_imms = np.zeros((n_states,))
-    #     next_vals = np.zeros((n_states,))
-    #     for s in range(n_states):
-    #         r_imms[s] = POMDP_model.reward(s, a)
-    #         next_s = T[:,s,a % n_states]
-    #         next_bs = np.zeros((n_states, n_states))
-    #         for s_new in range(n_states):
-    #             if next_s[s_new] > 0:
-    #                 y = a_tx[s_new]
-    #                 if y == 1:
-    #                     next_bs[s_new, s_new] = 1.0
-    #                 else:
-    #                     next_bs[s_new] = np.squeeze(T[:,:,a % n_states] @ b) * (1 - a_tx) 
-    #                     if np.sum(next_bs[s_new]) > 0:
-    #                         next_bs[s_new] = next_bs[s_new] / np.sum(next_bs[s_new])
-    #         next_vals[s] = np.dot(np.max(alpha_vectors @ next_bs.T, axis=0), next_s)
-    #     Q[a] = np.dot(np.squeeze(b), r_imms + gamma * next_vals)
-    # action_taken = np.argmax(Q)
-    # a_tx = action_taken // n_states
-    # string_representation_of_a_tx = f'{a_tx:0{n_states}b}' 
-    # a_tx = np.array([int(bit) for bit in string_representation_of_a_tx])
-    # return a_tx, action_taken % n_states
-            
-
+    assert np.shape(b) == (n_states, 1)      
     actions_values = alpha_vectors @ b
     best_action = action_map[np.argmax(actions_values)]
-    a_tx = np.array([int(el) for el in f'{best_action // n_states:0{n_states}b}'])
-    a_rx = best_action % n_states
+    a_tx = np.array([int(el) for el in f'{best_action // n_actions:0{n_states}b}'])
+    a_rx = best_action % n_actions
     return a_tx, a_rx
 
 
