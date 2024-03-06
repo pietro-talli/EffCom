@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # horizon = 100
 
     # type of experiment
-    experiment_type = "push_sparse_reward"
+    experiment_type = "push_spread_reward"
 
     # load mdps
     mdps, betas, params = load_mdps("configs/{}.json".format(experiment_type))
