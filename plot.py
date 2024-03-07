@@ -71,13 +71,13 @@ def process_files_in_folder(folder_path):
             plt.show()
 
 # Specify the folder containing the files
-folder_path = 'results/1/'
+folder_path = 'results_14/0/'
 
 # Process files in the folder
-process_files_in_folder(folder_path)
+# process_files_in_folder(folder_path)
 
 # Read the CSV file
-df = pd.read_csv('results/1/1_results.csv')
+df = pd.read_csv(folder_path + folder_path[-2] + '_results.csv')
 
 # Extract columns for the first set of points
 x1 = df.iloc[:, 4]  # 5th column
@@ -88,15 +88,15 @@ x2 = df.iloc[:, 6]  # 7th column
 y2 = df.iloc[:, 5]  # 6th column
 
 # Plot the first set of points
-plt.scatter(x1, y1, color='blue', label='First Set')
+plt.scatter(x1, y1, color='blue', label='POMDP')
 
 # Plot the second set of points
-plt.scatter(x2, y2, color='red', label='Second Set')
+plt.scatter(x2, y2, color='red', label='Policy Iteration')
 
 # Add labels and title
 plt.xlabel('X-axis')
 plt.ylabel('Y-axis')
-plt.title('Scatter Plot of Two Sets of Points')
+plt.title('Control problem 3')
 
 # Add legend
 plt.legend()

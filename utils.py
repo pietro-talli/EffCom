@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import os
-from EffCom.mdp import create_randomized_mdps
+from EffCom.mdp import create_randomized_mdps, create_estimation_mdp
 
 def load_mdps(name_of_file: str):
     """
@@ -43,6 +43,8 @@ def load_mdps(name_of_file: str):
     with open(name_of_file, 'r') as f:
         params = json.load(f)
     betas = np.linspace(params["beta"]["min"], params["beta"]["max"], params["beta"]["n"])
+    if params["name"] == "estimation":
+        return create_estimation_mdp(params["mdp"]["gamma"]), betas, params
     return create_randomized_mdps(**params["mdp"]), betas, params
 
 
