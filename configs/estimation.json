@@ -1,7 +1,7 @@
 {
     "mdp": {
         "N_states": 5,
-        "N_actions": 4,
+        "N_actions": 5,
         "gamma": 0.9,
         "r_seed": 1234,
         "reward_decay": 0.1
@@ -15,7 +15,7 @@
         "n": 21
     },
     "n_test_episodes": 100000,
-    "path": "./pull_spread_reward/",
-    "name": "pull_spread_reward",
-    "strategy": "pull"
+    "path": "./push_spread_reward/",
+    "name": "estimation",
+    "strategy": "push"
 }

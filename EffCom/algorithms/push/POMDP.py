@@ -44,7 +44,7 @@ class POMDP_solver(RL_Algorithm):
         tot_total_reward_undiscounted = 0
         tot_total_raw_reward_undiscounted = 0
         tot_total_ch_uti = 0
-        AoIs = [[]] * self.n_states
+        AoIs = [[] for _ in range(self.n_states)]
 
         for episode in range(n_episodes):
             # declare agent objects

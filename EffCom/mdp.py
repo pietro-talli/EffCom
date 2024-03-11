@@ -94,3 +94,16 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
             assert False
         
     return mdp_list
+
+
+def create_estimation_mdp(gamma: float):
+    R = np.tile(np.expand_dims(np.eye(5), axis=2), (1,1,5))
+    P = np.array( [[0.4, 0.6, 0.0, 0.0, 0.0],
+                   [0.0, 0.4, 0.6, 0.0, 0.0],
+                   [0.0, 0.0, 0.4, 0.6, 0.0],
+                   [0.0, 0.0, 0.0, 0.4, 0.6],
+                   [1.0, 0.0, 0.0, 0.0, 0.0]] )
+    P = np.tile(np.expand_dims(P, axis=0),(5,1,1))
+
+    mdp = MDP(5,5,P,R,gamma)
+    return [mdp]
