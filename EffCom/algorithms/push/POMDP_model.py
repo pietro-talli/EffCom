@@ -1,6 +1,6 @@
 import numpy as np
-from julia.POMDPTools import Deterministic
-from julia.QuickPOMDPs import DiscreteExplicitPOMDP
+from julia.POMDPTools import Deterministic, weighted_iteration
+from julia.QuickPOMDPs import DiscreteExplicitPOMDP, QuickPOMDP
 
 
 class POMDP_model():
@@ -45,13 +45,24 @@ class POMDP_model():
         """Define the POMDP using the interface required by NativeSARSOP."""
         if not np.all(np.isclose(np.sum(self.P, axis=2), 1.0)):
             raise Exception("2nd axis of P does not sum to 1")
-        out = DiscreteExplicitPOMDP( range(self.n_states), # state space
-                                     range((2 ** self.n_states) * self.n_actions), # action space
-                                     range(self.n_states + 1), # observation space
-                                     self.transition,
-                                     self.observation,
-                                     self.reward,
-                                     self.gamma, 
-                                     Deterministic(0) )
+        # out = DiscreteExplicitPOMDP( range(self.n_states), # state space
+        #                              range((2 ** self.n_states) * self.n_actions), # action space
+        #                              range(self.n_states + 1), # observation space
+        #                              self.transition,
+        #                              self.observation,
+        #                              self.reward,
+        #                              self.gamma, 
+        #                              Deterministic(0) )
+        
+        out = QuickPOMDP( states = range(self.n_states),
+                          actions = range((2 ** self.n_states) * self.n_actions),
+                          observations = range(self.n_states + 1),
+                          initialstate = Deterministic(0) 
+                          discount = self.gamma, 
+                          transition = lambda s,a: weighted_iteration(self.P[a % self.n_actions, s]),
+                          observation = lambda s, a, s_new: Deterministic(self.observation(s,a,s_new)), 
+                          reward = lambda s, a: Deterministic(self.R[s,a]) )
+
+
         print("WARNING: the POMDP is defined with the initial condition of starting at state 0")
         return out
