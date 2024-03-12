@@ -323,7 +323,7 @@ version = "0.14.3"
 
 [[deps.NativeSARSOP]]
 deps = ["LinearAlgebra", "POMDPTools", "POMDPs", "SparseArrays"]
-git-tree-sha1 = "c81adfca7615fc252190364e826763e53c14abe0"
+git-tree-sha1 = "4b2f588256a1b964582fced2e524df1747c78f79"
 repo-rev = "main"
 repo-url = "https://github.com/ed13santi/NativeSARSOP.jl"
 uuid = "a07c76ea-660d-4c9a-8028-2e6dbd212cb8"

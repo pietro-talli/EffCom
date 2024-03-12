@@ -6,6 +6,7 @@ import json
 import os
 from julia import Pkg
 from julia import NativeSARSOP, POMDPs
+import concurrent.futures
 
 from julia.POMDPTools import SparseCat,Deterministic
 from julia.QuickPOMDPs import DiscreteExplicitPOMDP
@@ -445,8 +446,8 @@ class RemotePolicyIteration(RL_Algorithm):
         while not policy_stable:
             self.policy_evaluation(beta)
             policy_stable = self.policy_improvement(beta)
-            print(self.eval_perf(100))
-            print(np.mean(self.V_actuator[:,0]))
+            # print(self.eval_perf(100))
+            # print(np.mean(self.V_actuator[:,0]))
             i += 1
             if i == max_iter:
                 break
@@ -689,7 +690,26 @@ def create_folder(folder_name):
 
 
 
+def run_one(p_list):
+    pomdp, policy_iteration, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder = p_list
+    pomdp.run(beta)
+    tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, AoIs = pomdp.eval_perf(horizon, runs_per_instance)
 
+    policy_iteration.run(beta)
+    r,c = policy_iteration.eval_perf(runs_per_instance)
+    aois_policy_iteration = []
+    for state in range(mdp.n_states):
+        aois_policy_iteration.append(policy_iteration.get_PeakAoI(state, 10))
+
+    with open("{}/{}_pomdp_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
+        pickle.dump(AoIs, f)
+    with open("{}/{}_politer_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
+        pickle.dump(aois_policy_iteration, f)
+    with open("{}/{}_results.csv".format(results_folder,str(mdp_i)), mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, r, c])
+
+    return None
 
 
 
@@ -721,49 +741,37 @@ if __name__ == "__main__":
     # horizon = 100
 
     # type of experiment
-    experiment_type = "push_spread_reward"
+    experiment_types = ["push_sparse_reward", "push_spread_reward","estimation"]
 
-    # load mdps
-    mdps, betas, params = load_mdps("configs/{}.json".format(experiment_type))
-    horizon = params["horizon"]
-    tmax = params["t_max"]
-    runs_per_instance = params["runs_per_instance"]
+    params_ll = []
 
-    # create folder for the results
-    results_folder = create_folder("results")
+    for experiment_type in experiment_types:
+        # load mdps
+        mdps, betas, params = load_mdps("configs/{}.json".format(experiment_type))
+        horizon = params["horizon"]
+        tmax = params["t_max"]
+        runs_per_instance = params["runs_per_instance"]
 
+        # create folder for the results
+        results_folder = create_folder(f"10_state_2/{experiment_type}")
+
+        # run experiments
+        for mdp_i, mdp in enumerate(mdps):
+            for beta in betas:
+                assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
+
+                pomdp = POMDP_solver(copy.deepcopy(mdp))
+                policy_iteration = RemotePolicyIteration(copy.deepcopy(mdp), horizon, tmax)
+
+                params_ll.append((pomdp, policy_iteration, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder))
+                
     # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #         #results_and_Pis = list(executor.map(run_test, params))
-    #         results = list(executor.map(run_test, params))
+    #     #results_and_Pis = list(executor.map(run_test, params))
+    #     results = list(executor.map(run_one, params_ll))
 
-    # run experiments
-    for mdp_i, mdp in enumerate(mdps):
-        assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
+    for p_el in params_ll:
+        results = run_one(p_el)
 
-        pomdp = POMDP_solver(copy.deepcopy(mdp))
-        policy_iteration = RemotePolicyIteration(copy.deepcopy(mdp), horizon, tmax)
 
-        mdp_folder = create_folder("{}/{}".format(results_folder,str(mdp_i)))
 
-        csv_file = "{}/{}_results.csv".format(mdp_folder,str(mdp_i))
 
-        for beta in betas:
-            print("running pomdp")
-            pomdp.run(beta)
-            tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, AoIs = pomdp.eval_perf(horizon, runs_per_instance)
-
-            policy_iteration.run(beta)
-            r,c = policy_iteration.eval_perf(runs_per_instance)
-            aois_policy_iteration = []
-            for state in range(mdp.n_states):
-                aois_policy_iteration.append(policy_iteration.get_PeakAoI(state, 10))
-
-            with open("{}/{}_pomdp_aoi_{}".format(mdp_folder,str(mdp_i), beta), 'wb') as f:
-                pickle.dump(AoIs, f)
-            with open("{}/{}_politer_aoi_{}".format(mdp_folder,str(mdp_i), beta), 'wb') as f:
-                pickle.dump(aois_policy_iteration, f)
-            with open("{}/{}_results.csv".format(mdp_folder,str(mdp_i)), mode='a', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, r, c])
-
-        mdp_csv = "{}/{}".format(mdp_folder,str(mdp_i))
