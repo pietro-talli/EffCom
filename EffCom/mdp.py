@@ -18,7 +18,9 @@ class MDP:
     '''
     def __init__(self, n_states: int, n_actions: int, P: np.ndarray, R: np.ndarray, gamma: float = 0.99):
         self.n_states = n_states
+        self.N_s = n_states
         self.n_actions = n_actions
+        self.N_a = n_actions
         self.gamma = gamma
         assert P.shape == (n_actions, n_states, n_states), f'P.shape = {P.shape}, expected {(n_actions, n_states, n_states)}'
         self.P = P
@@ -66,13 +68,17 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
             mdp_list[0].P[a][s][random_idx] = 1
 
             for i in range(1, int(N_states/2)):
+                offsets = [j for j in range(-i, i+1)]
                 new_link_set = [(random_idx + j) % N_states for j in range(-i, i+1)]
                 mdp_list[i].P[a][s] = np.zeros(N_states)
-                for idx in new_link_set:
-                    mdp_list[i].P[a][s][idx] = 0.5 - np.abs(idx)/len(new_link_set)
+                for offset,idx in zip(offsets, new_link_set):
+                    mdp_list[i].P[a][s][idx] = 0.5 - np.abs(offset)/len(new_link_set)
 
                 mdp_list[i].P[a,s,random_idx] += 0.1
                 mdp_list[i].P[a,s,:] /= np.sum(mdp_list[i].P[a,s,:])
+                if not np.all(mdp_list[i].P[a,s,:] >= 0):
+                    print(mdp_list[i].P[a,s,:])
+                    assert False
 
         for idx, m in enumerate(mdp_list):
             m.R = mdp_list[0].R 
@@ -80,5 +86,24 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
              
             for i in range(N_states):
                 m.R[:,:,i] = 10*np.exp(-np.abs(i-optimal_state)*reward_decay)
+
+    for mdp in mdp_list:
+        assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
+        if not np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0)):#, rtol=0.1,atol=0.1)):
+            print(mdp.P)
+            assert False
         
     return mdp_list
+
+
+def create_estimation_mdp(gamma: float):
+    R = np.tile(np.expand_dims(np.eye(5), axis=2), (1,1,5))
+    P = np.array( [[0.4, 0.6, 0.0, 0.0, 0.0],
+                   [0.0, 0.4, 0.6, 0.0, 0.0],
+                   [0.0, 0.0, 0.4, 0.6, 0.0],
+                   [0.0, 0.0, 0.0, 0.4, 0.6],
+                   [1.0, 0.0, 0.0, 0.0, 0.0]] )
+    P = np.tile(np.expand_dims(P, axis=0),(5,1,1))
+
+    mdp = MDP(5,5,P,R,gamma)
+    return [mdp]
