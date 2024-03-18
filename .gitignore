@@ -399,3 +399,5 @@ FodyWeavers.xsd
 
 # Results
 results*
+flags
+10_state*

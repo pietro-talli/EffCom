@@ -54,7 +54,7 @@ class POMDP_solver(RL_Algorithm):
             # set initial state
             b0 = np.zeros((self.mdp.n_states,))
             b0[0] = 1
-            print("WARNING: initial condition is hard coded to be that the initial state is always 0")
+            # print("WARNING: initial condition is hard coded to be that the initial state is always 0")
             state = np.random.choice(np.arange(self.n_states), p=b0)
 
             # run one step to initialize the beliefs

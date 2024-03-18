@@ -6,9 +6,9 @@
         "r_seed": 1234,
         "reward_decay": 10
     },
-    "horizon": 100,
+    "horizon": 1000,
     "t_max":100,
-    "runs_per_instance": 10,
+    "runs_per_instance": 100,
     "beta": {
         "min": 0.0,
         "max": 2.0,

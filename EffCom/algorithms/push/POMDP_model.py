@@ -64,5 +64,5 @@ class POMDP_model():
                           reward = lambda s, a: Deterministic(self.R[s,a]) )
 
 
-        print("WARNING: the POMDP is defined with the initial condition of starting at state 0")
+        # print("WARNING: the POMDP is defined with the initial condition of starting at state 0")
         return out

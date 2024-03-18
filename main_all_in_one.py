@@ -7,10 +7,13 @@ import os
 from julia import Pkg
 from julia import NativeSARSOP, POMDPs
 import concurrent.futures
+import uuid
+
 
 from julia.POMDPTools import SparseCat,Deterministic
 from julia.QuickPOMDPs import DiscreteExplicitPOMDP
 from quickpomdps import QuickPOMDP
+from julia import Main
 
 
 def transition_quick(s, a, n_s, n_a, P):
@@ -82,26 +85,26 @@ class POMDP_model():
         """Define the POMDP using the interface required by NativeSARSOP."""
         if not np.all(np.isclose(np.sum(self.P, axis=2), 1.0)):
             raise Exception("2nd axis of P does not sum to 1")
-        out = DiscreteExplicitPOMDP( range(self.n_states), # state space
-                                     range((2 ** self.n_states) * self.n_actions), # action space
-                                     range(self.n_states + 1), # observation space
-                                     self.transition,
-                                     self.observation,
-                                     self.reward,
-                                     self.gamma, 
-                                     Deterministic(0) )
+        # out = DiscreteExplicitPOMDP( range(self.n_states), # state space
+        #                              range((2 ** self.n_states) * self.n_actions), # action space
+        #                              range(self.n_states + 1), # observation space
+        #                              self.transition,
+        #                              self.observation,
+        #                              self.reward,
+        #                              self.gamma, 
+        #                              Deterministic(0) )
         
-        # out = QuickPOMDP( states = range(self.n_states),
-        #                   actions = range((2 ** self.n_states) * self.n_actions),
-        #                   observations = range(self.n_states + 1),
-        #                   initialstate = Deterministic(0),
-        #                   discount = self.gamma, 
-        #                   transition = lambda s, a: transition_quick(s, a, self.n_states, self.n_actions,self.P),
-        #                   observation = lambda a, s_new: observation_quick(a, s_new, self.n_states, self.n_actions), 
-        #                   reward = lambda s, a: reward_quick(s, a, self.R, self.P, self.gamma, self.t_cost, self.n_states, self.n_actions) )
+        out = QuickPOMDP( states = range(self.n_states),
+                          actions = range((2 ** self.n_states) * self.n_actions),
+                          observations = range(self.n_states + 1),
+                          initialstate = Deterministic(0),
+                          discount = self.gamma, 
+                          transition = lambda s, a: transition_quick(s, a, self.n_states, self.n_actions,self.P),
+                          observation = lambda a, s_new: observation_quick(a, s_new, self.n_states, self.n_actions), 
+                          reward = lambda s, a: reward_quick(s, a, self.R, self.P, self.gamma, self.t_cost, self.n_states, self.n_actions) )
 
 
-        print("WARNING: the POMDP is defined with the initial condition of starting at state 0")
+        # print("WARNING: the POMDP is defined with the initial condition of starting at state 0")
         return out
 
 
@@ -219,6 +222,7 @@ class POMDP_solver(RL_Algorithm):
         self.mdp = mdp
         self.mdp.R = np.sum(self.mdp.R * self.mdp.P, axis=2).T # (a,s,s_new)
         self.n_states = mdp.n_states
+        self.flagdir = os.path.join(os.getcwd(), "/flags/{}.txt".format(str(uuid.uuid4())))
 
     def run(self, beta):
         self.beta = beta # MAYBE NOT THE BEST WAY
@@ -228,18 +232,20 @@ class POMDP_solver(RL_Algorithm):
             raise Exception("2nd axis of P does not sum to 1")
         self.POMDP_model = POMDP_model(self.mdp, beta)
         POMDP_interface = self.POMDP_model.get_interface()
-        solver = NativeSARSOP.SARSOPSolver( epsilon    = 0.01,
+        solver = NativeSARSOP.SARSOPSolver( epsilon    = 0.5,
                                             precision  = 0.01,
                                             kappa      = 0.5,
                                             delta      = 0.0001,
-                                            max_time   = 300.0,  
-                                            verbose    = True   )
+                                            max_time   = 3600.0,  
+                                            verbose    = False,
+                                            path       = self.flagdir )
 
         # train model
         policy_JuliaObj = POMDPs.solve(solver, POMDP_interface) 
 
         # extract value function vectors and action map
         alpha_vectors = np.array(policy_JuliaObj.alphas)
+        #solver.distance_from_optimal = Main.eval("policy_JuliaObj[1]")
         action_map = policy_JuliaObj.action_map
 
         # create auxiliary functions
@@ -263,7 +269,7 @@ class POMDP_solver(RL_Algorithm):
             # set initial state
             b0 = np.zeros((self.mdp.n_states,))
             b0[0] = 1
-            print("WARNING: initial condition is hard coded to be that the initial state is always 0")
+            # print("WARNING: initial condition is hard coded to be that the initial state is always 0")
             state = np.random.choice(np.arange(self.n_states), p=b0)
 
             # run one step to initialize the beliefs
@@ -555,6 +561,7 @@ class RemotePolicyIteration(RL_Algorithm):
     def eval_perf(self, n_episodes):
         tot_r = 0
         tot_c = 0
+        discounted_rminusc = 0
         for _ in range(n_episodes):
             s = np.random.randint(self.mdp.N_s)
             s_last = s
@@ -562,9 +569,11 @@ class RemotePolicyIteration(RL_Algorithm):
             for h in range(self.H):
                 action = self.pi_actuator[s_last,t]
                 s_next = np.random.choice(self.mdp.N_s, p=self.mdp.P[action,s])
-                tot_r += self.mdp.R[action,s,s_next]
+                r = self.mdp.R[action,s,s_next]
+                tot_r += r
 
                 c_t = self.pi_sensor[s_last,t,s_next]
+                discounted_rminusc += (self.mdp.gamma ** h) * (r-c_t)
                 if h != self.H-1: tot_c += c_t
                 if c_t == 0:
                     t += 1
@@ -572,7 +581,7 @@ class RemotePolicyIteration(RL_Algorithm):
                     t = 0
                     s_last = s_next
                 s = s_next
-        return tot_r/(n_episodes*self.H), tot_c/(n_episodes*self.H)
+        return tot_r/(n_episodes*self.H), tot_c/(n_episodes*self.H), discounted_rminusc/n_episodes
     
     def get_PeakAoI(self, target_state: int, n_episodes: int = 1000):
         tot_r = 0
@@ -615,7 +624,17 @@ class RemotePolicyIteration(RL_Algorithm):
 
 
 
+def create_estimation_mdp(gamma: float):
+    R = np.tile(np.expand_dims(np.eye(5), axis=2), (1,1,5))
+    P = np.array( [[0.4, 0.6, 0.0, 0.0, 0.0],
+                   [0.0, 0.4, 0.6, 0.0, 0.0],
+                   [0.0, 0.0, 0.4, 0.6, 0.0],
+                   [0.0, 0.0, 0.0, 0.4, 0.6],
+                   [1.0, 0.0, 0.0, 0.0, 0.0]] )
+    P = np.tile(np.expand_dims(P, axis=0),(5,1,1))
 
+    mdp = MDP(5,5,P,R,gamma)
+    return [mdp]
 
 
 
@@ -661,6 +680,8 @@ def load_mdps(name_of_file: str):
     with open(name_of_file, 'r') as f:
         params = json.load(f)
     betas = np.linspace(params["beta"]["min"], params["beta"]["max"], params["beta"]["n"])
+    if params["name"] == "estimation":
+        return create_estimation_mdp(params["mdp"]["gamma"]), betas, params
     return create_randomized_mdps(**params["mdp"]), betas, params
 
 
@@ -694,9 +715,12 @@ def run_one(p_list):
     pomdp, policy_iteration, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder = p_list
     pomdp.run(beta)
     tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, AoIs = pomdp.eval_perf(horizon, runs_per_instance)
+    with open(pomdp.flagdir, "r") as file:
+        flag = file.read(1)
+
 
     policy_iteration.run(beta)
-    r,c = policy_iteration.eval_perf(runs_per_instance)
+    r,c,discounted_rminusc = policy_iteration.eval_perf(runs_per_instance)
     aois_policy_iteration = []
     for state in range(mdp.n_states):
         aois_policy_iteration.append(policy_iteration.get_PeakAoI(state, 10))
@@ -707,7 +731,7 @@ def run_one(p_list):
         pickle.dump(aois_policy_iteration, f)
     with open("{}/{}_results.csv".format(results_folder,str(mdp_i)), mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, r, c])
+        writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, flag, r, c, discounted_rminusc])
 
     return None
 
@@ -741,9 +765,10 @@ if __name__ == "__main__":
     # horizon = 100
 
     # type of experiment
-    experiment_types = ["push_sparse_reward", "push_spread_reward","estimation"]
+    experiment_types = ["push_sparse_reward", "push_spread_reward", "estimation"]
 
     params_ll = []
+    results_folder_ori = create_folder("10_state_2")
 
     for experiment_type in experiment_types:
         # load mdps
@@ -753,7 +778,7 @@ if __name__ == "__main__":
         runs_per_instance = params["runs_per_instance"]
 
         # create folder for the results
-        results_folder = create_folder(f"10_state_2/{experiment_type}")
+        results_folder = create_folder(f"{results_folder_ori}/{experiment_type}")
 
         # run experiments
         for mdp_i, mdp in enumerate(mdps):
