@@ -30,7 +30,7 @@ class MDP:
         # density of the transition matrices of the MDP
         self.density = None
 
-def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: int = 1234, reward_decay: float = 10.0):
+def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: int = 1234, reward_decay = 10.0):
     """
     This method create a list of random MDP starting from the same 
     deterministic structure and adding variability in the transition
@@ -80,12 +80,25 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
                     print(mdp_list[i].P[a,s,:])
                     assert False
 
+    if type(reward_decay) is not list:
         for idx, m in enumerate(mdp_list):
             m.R = mdp_list[0].R 
             m.density = (2*idx+1)/N_states
              
             for i in range(N_states):
                 m.R[:,:,i] = 10*np.exp(-np.abs(i-optimal_state)*reward_decay)
+
+    elif type(reward_decay) == list:
+        second_optimal_state = np.random.randint(0,N_states) 
+        while second_optimal_state == optimal_state:
+            second_optimal_state = np.random.randint(0,N_states)
+        for idx, m in enumerate(mdp_list):
+            m.R = mdp_list[0].R 
+            m.density = (2*idx+1)/N_states
+             
+            for i in range(N_states):
+                m.R[:,:,i] = 10*np.exp(-np.abs(i-optimal_state)*reward_decay[0])
+                m.R[:,:,i] += 1*np.exp(-np.abs(i-second_optimal_state)*reward_decay[1])
 
     for mdp in mdp_list:
         assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
