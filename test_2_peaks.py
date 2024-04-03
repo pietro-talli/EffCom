@@ -13,15 +13,15 @@ mdp_list = create_randomized_mdps(N_states=30,
                                   r_seed=1234,
                                   reward_decay=[10,0.7])
 
-rpi = RemotePolicyIteration(mdp_list[1], 100, 10, 1)
+rpi = RemotePolicyIteration(mdp_list[2], 100, 10, 1)
 
-rpi.run(beta=1.5)
+rpi.run(beta=0.8)
 
 print('Terminated')
 
-rpi2 = RemotePolicyIteration(mdp_list[1], 100, 10, 0)
+rpi2 = RemotePolicyIteration(mdp_list[2], 100, 10, 0)
 
-rpi2.run(beta=1.5)
+rpi2.run(beta=0.8)
 
 print('Terminated')
 
@@ -36,6 +36,13 @@ ro_2 += 1e-10
 
 # TV distance
 print(np.mean(np.abs(ro_1-ro_2)))
+
+import matplotlib.pyplot as plt
+plt.plot(ro_1, label='rpi')
+plt.plot(ro_2, label='rpi2')
+plt.plot(mdp_list[1].R[0,0,:]/15, label='R')
+plt.legend()
+plt.show()
 
 print(np.array_equal(rpi.pi_actuator, rpi2.pi_actuator))
 print(np.array_equal(rpi.pi_sensor, rpi2.pi_sensor))

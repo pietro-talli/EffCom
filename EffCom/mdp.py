@@ -97,7 +97,7 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
             m.density = (2*idx+1)/N_states
              
             for i in range(N_states):
-                m.R[:,:,i] = 10*np.exp(-np.abs(i-optimal_state)*reward_decay[0])
+                m.R[:,:,i] = 5*np.exp(-np.abs(i-optimal_state)*reward_decay[0])
                 m.R[:,:,i] += 1*np.exp(-np.abs(i-second_optimal_state)*reward_decay[1])
 
     for mdp in mdp_list:
