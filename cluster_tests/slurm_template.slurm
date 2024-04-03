@@ -19,5 +19,5 @@ echo
 echo Starting the job...
 
 $pydir/python3 test_2_peaks.py \
---density_idx DENSITY \
+--density DENSITY \
 --beta BETA \
