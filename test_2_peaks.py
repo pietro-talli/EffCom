@@ -3,9 +3,16 @@ from EffCom.algorithms.push.policy_iteration import RemotePolicyIteration
 import json
 import numpy as np
 
-from joblib import Parallel, delayed
+import os 
+import argparse
 
-config = json.load(open('configs/push_sparse_reward.json', 'r'))
+argparser = argparse.ArgumentParser()
+argparser.add_argument('--density', type=int)
+argparser.add_argument('--beta', type=float)
+
+args = argparser.parse_args()
+idx = args.density
+beta = args.beta
 
 mdp_list = create_randomized_mdps(N_states=30,
                                   N_actions=4,
@@ -13,36 +20,31 @@ mdp_list = create_randomized_mdps(N_states=30,
                                   r_seed=1234,
                                   reward_decay=[10,0.7])
 
-rpi = RemotePolicyIteration(mdp_list[2], 100, 10, 1)
+mdp = mdp_list[idx]
 
-rpi.run(beta=0.8)
-
-print('Terminated')
-
-rpi2 = RemotePolicyIteration(mdp_list[2], 100, 10, 0)
-
-rpi2.run(beta=0.8)
+# always transmits at the beginning
+rpi = RemotePolicyIteration(mdp, 100, 100, 1)
+rpi.run(beta=beta)
 
 print('Terminated')
 
-r1,c1,ro_1 = rpi.eval_perf(1000)
-r2,c2,ro_2 = rpi2.eval_perf(1000)
+# save the results
 
-print(r1,c1)
-print(r2,c2)
+name_of_policy = 'results/policy_sensor_' + str(idx) + '_' + str(beta) + '_always.npy'
+np.save(name_of_policy, rpi.pi_sensor)
+name_of_policy = 'results/policy_actuator_' + str(idx) + '_' + str(beta) + '_always.npy'
+np.save(name_of_policy, rpi.pi_actuator)
 
-ro_1 += 1e-10
-ro_2 += 1e-10
 
-# TV distance
-print(np.mean(np.abs(ro_1-ro_2)))
+# never transmits at the beginning
+rpi = RemotePolicyIteration(mdp, 100, 100, 0)
+rpi.run(beta=beta)
 
-import matplotlib.pyplot as plt
-plt.plot(ro_1, label='rpi')
-plt.plot(ro_2, label='rpi2')
-plt.plot(mdp_list[1].R[0,0,:]/15, label='R')
-plt.legend()
-plt.show()
+print('Terminated')
 
-print(np.array_equal(rpi.pi_actuator, rpi2.pi_actuator))
-print(np.array_equal(rpi.pi_sensor, rpi2.pi_sensor))
+# save the results
+
+name_of_policy = 'results/policy_sensor_' + str(idx) + '_' + str(beta) + '_never.npy'
+np.save(name_of_policy, rpi.pi_sensor)
+name_of_policy = 'results/policy_actuator_' + str(idx) + '_' + str(beta) + '_never.npy'
+np.save(name_of_policy, rpi.pi_actuator)
