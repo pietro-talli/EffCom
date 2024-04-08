@@ -80,7 +80,7 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
                     print(mdp_list[i].P[a,s,:])
                     assert False
 
-    if type(reward_decay) is not list:
+    if type(reward_decay) is float or type(reward_decay) is int:
         for idx, m in enumerate(mdp_list):
             m.R = mdp_list[0].R 
             m.density = (2*idx+1)/N_states
