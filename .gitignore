@@ -397,6 +397,10 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-results/
+results_2_peaks/
 logs/
 cluster_tests/logs/
+
+*.npy
+*.zip
+*.png
