@@ -398,7 +398,7 @@ FodyWeavers.xsd
 *.sln.iml
 
 results_2_peaks/
-reslts_estimation_edoardo/
+results_estimation_edoardo/
 logs/
 cluster_tests/logs/
 
