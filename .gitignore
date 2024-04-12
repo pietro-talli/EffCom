@@ -405,3 +405,4 @@ cluster_tests/logs/
 *.npy
 *.zip
 *.png
+*.tex

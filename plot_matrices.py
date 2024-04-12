@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import tikzplotlib
 
-df = pd.read_csv('results/results.csv')
+df = pd.read_csv('results_2_peaks/results.csv')
 
 # add name of columns 
 df.columns = ['index', 'density', 'beta', 'r_a', 'r_n', 'c_a', 'c_n']
@@ -21,27 +21,86 @@ for i in range(1,15):
     cost_never[i-1] = df[(df['density'] == i)]['c_n'].values
 
 plt.figure()
+plt.subplot(2,2,1)
 plt.imshow(reward_always, aspect='auto')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
 
-plt.figure()
+plt.subplot(2,2,2)
 plt.imshow(reward_never, aspect='auto')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
 
-plt.figure()
+plt.subplot(2,2,3)
 plt.imshow(cost_always, aspect='auto')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
 
-plt.figure()
+plt.subplot(2,2,4)
 plt.imshow(cost_never, aspect='auto')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
+
+reward_star = np.zeros((14,21))
+cost_star = np.zeros((14,21))
+idx_star = np.zeros((14,21))
+gap = np.zeros((14,21))
+
+for i in range(1,15):
+    for j, beta in enumerate(betas):
+        phi_a = reward_always[i-1,j] - beta*cost_always[i-1,j]
+        phi_n = reward_never[i-1,j] - beta*cost_never[i-1,j]
+        delta = np.abs(phi_a - phi_n)
+        if delta < 1e-2:
+            reward_star[i-1,j] = reward_always[i-1,j]
+            cost_star[i-1,j] = cost_always[i-1,j]
+            idx_star[i-1,j] = 0
+            gap[i-1,j] = 0
+        elif phi_a > phi_n:
+            reward_star[i-1,j] = reward_always[i-1,j]
+            cost_star[i-1,j] = cost_always[i-1,j]
+            idx_star[i-1,j] = 1
+            gap[i-1,j] = phi_a - phi_n
+        elif phi_a < phi_n:
+            reward_star[i-1,j] = reward_never[i-1,j]
+            cost_star[i-1,j] = cost_never[i-1,j]
+            idx_star[i-1,j] = -1
+            gap[i-1,j] = phi_n - phi_a
+
+plt.figure()
+plt.imshow(reward_star, aspect='auto')
+plt.colorbar()
+plt.xlabel('Beta')
+plt.ylabel('Density')
+plt.savefig('figs/2_peaks_reward_star.png')
+tikzplotlib.save('figs/2_peaks_reward_star.tex')
+
+plt.figure()
+plt.imshow(cost_star, aspect='auto')
+plt.colorbar()
+plt.xlabel('Beta')
+plt.ylabel('Density')
+plt.savefig('figs/2_peaks_cost_star.png')
+tikzplotlib.save('figs/2_peaks_cost_star.tex')
+
+plt.figure()
+plt.imshow(idx_star, aspect='auto')
+plt.colorbar()
+plt.xlabel('Beta')
+plt.ylabel('Density')
+plt.savefig('figs/2_peaks_idx_star.png')
+tikzplotlib.save('figs/2_peaks_idx_star.tex')
+
+plt.figure()
+plt.imshow(gap, aspect='auto')
+plt.colorbar()
+plt.xlabel('Beta')
+plt.ylabel('Density')
+plt.savefig('figs/2_peaks_gap.png')
+tikzplotlib.save('figs/2_peaks_gap.tex')
 
 plt.show()
