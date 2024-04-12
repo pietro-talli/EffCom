@@ -1,6 +1,6 @@
 #!/bin/sh
-#SBATCH --job-name=EffCom_13_1.7_push
-#SBATCH --output=../logs/ASoI_13_1.7_%j.log
+#SBATCH --job-name=EffCom_13_1.9_push
+#SBATCH --output=../logs/ASoI_13_1.9_%j.log
 #SBATCH --partition=allgroups
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
@@ -20,5 +20,5 @@ echo Starting the job...
 
 $pydir/python3 test_estimation_30.py \
 --density 13 \
---beta 1.7
+--beta 1.9
 
