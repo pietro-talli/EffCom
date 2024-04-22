@@ -18,7 +18,7 @@ cd ..
 echo
 echo Starting the job...
 
-$pydir/python3 test_pull_2_peaks.py \
+$pydir/python3 test_pull_estimation_30.py \
 --density DENSITY \
 --beta BETA
 
