@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import tikzplotlib
 
-df = pd.read_csv('results_2_peaks/results.csv')
+df = pd.read_csv('results_estimation_30/results.csv')
 
 # add name of columns 
 df.columns = ['index', 'density', 'beta', 'r_a', 'r_n', 'c_a', 'c_n']
@@ -55,7 +55,7 @@ for i in range(1,15):
         phi_a = reward_always[i-1,j] - beta*cost_always[i-1,j]
         phi_n = reward_never[i-1,j] - beta*cost_never[i-1,j]
         delta = np.abs(phi_a - phi_n)
-        if delta < 1e-2:
+        if delta < 1e-3:
             reward_star[i-1,j] = reward_always[i-1,j]
             cost_star[i-1,j] = cost_always[i-1,j]
             idx_star[i-1,j] = 0
@@ -76,31 +76,31 @@ plt.imshow(reward_star, aspect='auto', origin='lower')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
-plt.savefig('figs/2_peaks_reward_star.png')
-tikzplotlib.save('figs/2_peaks_reward_star.tex')
+plt.savefig('figs/estimation_30_reward_star.png')
+tikzplotlib.save('figs/estimation_30_reward_star.tex')
 
 plt.figure()
 plt.imshow(cost_star, aspect='auto', origin='lower')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
-plt.savefig('figs/2_peaks_cost_star.png')
-tikzplotlib.save('figs/2_peaks_cost_star.tex')
+plt.savefig('figs/estimation_30_cost_star.png')
+tikzplotlib.save('figs/estimation_30_cost_star.tex')
 
 plt.figure()
 plt.imshow(idx_star, aspect='auto', origin='lower')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
-plt.savefig('figs/2_peaks_idx_star.png')
-tikzplotlib.save('figs/2_peaks_idx_star.tex')
+plt.savefig('figs/estimation_30_idx_star.png')
+tikzplotlib.save('figs/estimation_30_idx_star.tex')
 
 plt.figure()
 plt.imshow(gap, aspect='auto', origin='lower')
 plt.colorbar()
 plt.xlabel('Beta')
 plt.ylabel('Density')
-plt.savefig('figs/2_peaks_gap.png')
-tikzplotlib.save('figs/2_peaks_gap.tex')
+plt.savefig('figs/estimation_30_gap.png')
+tikzplotlib.save('figs/estimation_30_gap.tex')
 
 plt.show()
