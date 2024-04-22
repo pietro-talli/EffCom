@@ -14,8 +14,8 @@ idx = args.density
 beta = args.beta
 
 mdp_list = create_randomized_mdps_estimation(N_states=30,
-                                             N_actions=4,
-                                             gamma=0.99,
+                                             N_actions=30,
+                                             gamma=0.9,
                                              r_seed=1234)
 
 mdp = mdp_list[idx]
