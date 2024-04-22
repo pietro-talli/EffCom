@@ -53,3 +53,5 @@ plt.imshow(cost, aspect='auto', origin='lower')
 plt.savefig('results_pull_estimation_30/cost_pull_estimation_30.png')
 tikzplotlib.save('results_pull_estimation_30/cost_pull_estimation_30.tex')
 plt.colorbar()
+
+plt.show()

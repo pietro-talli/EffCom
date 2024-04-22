@@ -10,11 +10,11 @@ result_path = 'results_pull_estimation_30'
 
 mdps = create_randomized_mdps(30,
                               4,
-                              0.99,
+                              0.9,
                               1234,
                               [10,0.7])
 
-#mdps = create_randomized_mdps_estimation(N_states=30, N_actions=30, gamma=0.99, r_seed=1234)
+mdps = create_randomized_mdps_estimation(N_states=30, N_actions=30, gamma=0.99, r_seed=1234)
 
 betas = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]
 #betas = np.linspace(0.0, 2, 21)
@@ -56,6 +56,7 @@ for i, mdp in enumerate(mdps):
         # plt.close()
         #     #print('Error with density {} and beta {}'.format(i, beta))
         rpi = PolicyIterationWithSampling(mdp, 100, 100)
+        rpi.pi = np.load(result_path+'/policy_' + str(i) +'_' + str(beta) + '.npy')
         r,c = rpi.eval_perf(1000)
         df = pd.DataFrame({'density': [i],
                             'beta': [beta],
@@ -64,4 +65,3 @@ for i, mdp in enumerate(mdps):
         df.to_csv(result_path+'/results.csv', mode='a', header=False)
         print('Done with density {} and beta {}'.format(i, beta))
 print('Done with all')
-
