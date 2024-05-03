@@ -4,8 +4,8 @@ import pickle
 import csv
 import json
 import os
-from julia import Pkg
-from julia import NativeSARSOP, POMDPs
+# from julia import Pkg
+# from julia import NativeSARSOP, POMDPs
 import concurrent.futures
 import uuid
 import gymnasium as gym
@@ -16,10 +16,10 @@ from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoMod
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common import env_checker
 
-from julia.POMDPTools import SparseCat,Deterministic
-from julia.QuickPOMDPs import DiscreteExplicitPOMDP
-from quickpomdps import QuickPOMDP
-from julia import Main
+# from julia.POMDPTools import SparseCat,Deterministic
+# from julia.QuickPOMDPs import DiscreteExplicitPOMDP
+# from quickpomdps import QuickPOMDP
+# from julia import Main
 
 
 def transition_quick(s, a, n_s, n_a, P):
@@ -208,7 +208,7 @@ def create_randomized_mdps(N_states: int, N_actions: int, gamma: float, r_seed: 
             print(mdp.P)
             assert False
         
-    return mdp_list[4:]
+    return mdp_list[1:]
 
 
 
@@ -240,7 +240,7 @@ class POMDP_solver(RL_Algorithm):
         create_file_if_not_exists(self.flagdir)
 
 
-    def run(self, beta):
+    def run(self, beta, upper_bound_init):
         self.beta = beta # MAYBE NOT THE BEST WAY
 
         # create the POMDP interface and declare the solver
@@ -252,10 +252,11 @@ class POMDP_solver(RL_Algorithm):
                                             precision  = 0.0001,
                                             kappa      = 0.5,
                                             delta      = 0.0001,
-                                            max_time   = 18000.0,  
+                                            max_time   = 3600.0,  
                                             r_max      = np.max(self.mdp.R),
                                             verbose    = False,
-                                            path       = self.flagdir )
+                                            path       = self.flagdir,
+                                            ubi        = upper_bound_init )
 
         # train model
         policy_JuliaObj = POMDPs.solve(solver, POMDP_interface) 
@@ -269,12 +270,14 @@ class POMDP_solver(RL_Algorithm):
         self.best_action = lambda b: get_action(b, alpha_vectors, action_map, self.mdp.n_states, self.mdp.n_actions, self.POMDP_model, self.mdp.gamma)
         self.update_b = lambda b, a_tx, a_rx, o: update_b(b, a_tx, a_rx, o, self.mdp.n_states, self.mdp.P)     
 
-        # alpha_list = []
-        # for row in range(np.shape(alpha_vectors)[0]):
-        #     tmp = []
-        #     for col in range(np.shape(alpha_vectors)[1]):
-        #         tmp.append(copy.deepcopy(alpha_vectors[row,col]))
-        #     alpha_list.append(copy.deepcopy(tmp))
+        alpha_list = []
+        for row in range(np.shape(alpha_vectors)[0]):
+            tmp = []
+            for col in range(np.shape(alpha_vectors)[1]):
+                tmp.append(copy.deepcopy(alpha_vectors[row,col]))
+            alpha_list.append(copy.deepcopy(tmp))
+
+        return alpha_list
 
 
     def eval_perf(self, horizon, n_episodes):
@@ -323,11 +326,11 @@ class POMDP_solver(RL_Algorithm):
 
                 action = actuator.step(message)
 
-                # Get reward and add to total 
+                # Get reward and add to total
                 reward = self.mdp.R[state, action]
                 combined_reward = reward - transmission_cost
-                total_reward += (self.mdp.gamma ** t) * combined_reward
-                total_raw_reward += (self.mdp.gamma ** t) * reward
+                total_reward += (self.mdp.gamma ** t) * combined_reward / horizon
+                total_raw_reward += reward / horizon
                 total_reward_undiscounted += combined_reward / horizon
                 total_raw_reward_undiscounted += reward / horizon
                 total_ch_uti += int(message is not None) / horizon
@@ -336,10 +339,10 @@ class POMDP_solver(RL_Algorithm):
                 state = np.random.choice(np.arange(self.n_states), p=self.mdp.P[action,state])
 
             # Add results to total averages
-            tot_total_reward += (total_reward / n_episodes) # this is the total combined discounted reward (scaled needlessly by horizon)
-            tot_total_raw_reward += (total_raw_reward / n_episodes) # this is the total undiscounted raw reward
-            tot_total_reward_undiscounted += (total_reward_undiscounted / n_episodes) # total undiscounted combined reward
-            tot_total_raw_reward_undiscounted += (total_raw_reward_undiscounted / n_episodes) # this is the total undiscounted raw reward
+            tot_total_reward += (total_reward / n_episodes)
+            tot_total_raw_reward += (total_raw_reward / n_episodes)
+            tot_total_reward_undiscounted += (total_reward_undiscounted / n_episodes)
+            tot_total_raw_reward_undiscounted += (total_raw_reward_undiscounted / n_episodes)
             tot_total_ch_uti += (total_ch_uti / n_episodes)
 
         # print(tot_total_reward)
@@ -585,8 +588,7 @@ class RemotePolicyIteration(RL_Algorithm):
     def eval_perf(self, n_episodes):
         tot_r = 0
         tot_c = 0
-        discounted_r = 0
-        discounted_c = 0
+        discounted_rminusc = 0
         for _ in range(n_episodes):
             s = np.random.randint(self.mdp.N_s)
             s_last = s
@@ -598,8 +600,7 @@ class RemotePolicyIteration(RL_Algorithm):
                 tot_r += r
 
                 c_t = self.pi_sensor[s_last,t,s_next]
-                discounted_r += (self.mdp.gamma ** h) * r
-                discounted_c += (self.mdp.gamma ** h) * c_t
+                discounted_rminusc += (self.mdp.gamma ** h) * (r-c_t)
                 if h != self.H-1: tot_c += c_t
                 if c_t == 0:
                     t += 1
@@ -607,7 +608,7 @@ class RemotePolicyIteration(RL_Algorithm):
                     t = 0
                     s_last = s_next
                 s = s_next
-        return tot_r/(n_episodes*self.H), tot_c/(n_episodes*self.H), discounted_r/n_episodes, discounted_c/n_episodes
+        return tot_r/(n_episodes*self.H), tot_c/(n_episodes*self.H), discounted_rminusc/n_episodes
     
     def get_PeakAoI(self, target_state: int, n_episodes: int = 1000):
         tot_r = 0
@@ -638,220 +639,6 @@ class RemotePolicyIteration(RL_Algorithm):
                     t = 0
                     s_last = s_next
 
-                    
-                    if s_last == target_state:
-                        paoi = 1
-                    else:
-                        paoi = 0
-
-                s = s_next
-        return PAOI
-    
-
-
-
-class PolicyIterationWithSampling(RL_Algorithm):
-    """
-    Class that implements the policy iteration algorithm where sampling
-    of the state comes with a cost. 
-
-    Parameters:
-    -----------
-    mdp: MDP
-        MDP object
-    horizon: int
-        Horizon of the problem
-    t_max: int
-        Maximum number of consecutive actions before sensing
-
-    Attributes:
-    -----------
-    mdp: MDP
-        MDP object
-    H: int
-        Horizon of the problem
-    V: np.array
-        Value function
-    pi: np.array
-        Policy
-    t_max: int
-        Maximum number of consecutive actions before sensing
-
-    Methods:
-    --------
-    run(beta):
-        Run the policy iteration algorithm
-    policy_evaluation(beta):
-        Evaluate the policy
-    policy_improvement(beta):
-        Improve the policy
-    simulate(s,t,belief,beta):
-        Simulate the reward for a given state and belief
-    eval_perf(n_episodes):
-        Evaluate the performance of the policy
-
-    """
-    def __init__(self, mdp, horizon, t_max):
-        self.mdp = mdp
-        self.H = horizon
-        self.V = np.random.rand(self.mdp.N_s,t_max,2) #np.zeros((self.mdp.N_s, t_max, 2))
-        self.pi = np.random.randint(0,self.mdp.N_a, (self.mdp.N_s, t_max, 2))
-        self.pi[:,:,1] = np.random.randint(0,2, (self.mdp.N_s, t_max))
-        self.pi[:,-1,1] = 1
-        self.t_max = t_max
-        self.gamma_square_root = self.mdp.gamma**(1/2)
-
-    def run(self, beta):
-        policy_stable = False
-        max_iter = 100
-        i = 0
-        while not policy_stable:
-            self.policy_evaluation(beta)
-            policy_stable = self.policy_improvement(beta)
-            print('Reward and cost: ', self.eval_perf(100))
-            print(np.mean(self.V[:,0,0]))
-            i += 1
-            if i == max_iter:
-                break
-
-    def policy_evaluation(self, beta):
-        delta = 1
-        theta = 1e-5
-        while delta > theta:
-            delta = 0
-            for s in range(self.mdp.N_s):
-                belief = np.zeros(self.mdp.N_s)
-                belief[s] = 1
-                for t in range(self.t_max):
-                    # Update the value function for the MDP action
-                    v = self.V[s,t,0]
-                    action = self.pi[s,t,0]
-                    belief_after_action = np.dot(belief,self.mdp.P[action])
-                    immediate_reward = np.dot(belief_after_action, np.dot(belief,self.mdp.R[action]))
-                    self.V[s,t,0] = immediate_reward + self.gamma_square_root * self.V[s,t,1]
-                    delta = max(delta, abs(v - self.V[s,t,0]))
-                    # Update the value function for the sensing action
-                    v = self.V[s,t,1]
-                    belief = belief_after_action
-                    c = self.pi[s,t,1]
-                    if t == self.t_max-1:
-                        self.V[s,t,1] = -beta + self.gamma_square_root*(np.dot(self.V[:,0,0],belief))
-                        delta = max(delta, abs(v - self.V[s,t,1]))
-                    else:
-                        if c == 1:
-                            self.V[s,t,1] = -beta + self.gamma_square_root*(np.dot(self.V[:,0,0],belief))
-                            delta = max(delta, abs(v - self.V[s,t,1]))
-                        else:
-                            self.V[s,t,1] = self.gamma_square_root*self.V[s,t+1,0]
-                            delta = max(delta, abs(v - self.V[s,t,1]))
-
-    def policy_improvement(self, beta):
-        policy_stable = True
-        for s in range(self.mdp.N_s):
-            belief = np.zeros(self.mdp.N_s)
-            belief[s] = 1
-            for t in range(self.t_max):
-                # Update the policy for the MDP action
-                old_action = self.pi[s,t,0]
-                values = np.zeros(self.mdp.N_a)
-                for action in range(self.mdp.N_a):
-                    belief_after_action = np.dot(belief, self.mdp.P[action])
-                    immediate_reward = np.dot(np.dot(belief, self.mdp.R[action]), belief_after_action)
-                    c = self.pi[s,t,1]
-                    if c == 1:
-                        value = immediate_reward - self.gamma_square_root*beta + self.mdp.gamma*(belief_after_action.dot(self.V[:,0,0]))# self.gamma_square_root * self.V[s,t,1]
-                    else:
-                        reward_simulated = self.simulate(s,t,belief_after_action, beta)
-                        value = immediate_reward + self.mdp.gamma*reward_simulated
-                    values[action] = value
-                #values += np.random.normal(0, 1e-8, self.mdp.N_a)
-
-                self.pi[s,t,0] = np.argmax(values)
-                if old_action != self.pi[s,t,0]:
-                    policy_stable = False
-
-                # Update the policy for the sensing action
-                belief = np.dot(belief, self.mdp.P[self.pi[s,t,0]])
-                old_c = self.pi[s,t,1]
-
-                if t == self.t_max-1:
-                    self.pi[s,t,1] = 1
-                else:
-                    values = np.zeros(2)
-                    values[0] = self.gamma_square_root*self.V[s,t+1,0]
-                    values[1] = -beta + self.gamma_square_root*(np.dot(self.V[:,0,0],belief))
-                    self.pi[s,t,1] = np.argmax(values)
-
-                if old_c != self.pi[s,t,1]:
-                    policy_stable = False
-        return policy_stable
-
-    def simulate(self, s, t, belief, beta):
-        reward = 0
-        action_tau = self.pi[s,t+1,0]
-        belief_after_action = np.dot(belief, self.mdp.P[action_tau])
-        if self.pi[s,t+1,1] == 0:
-            new_r =  np.dot(belief_after_action,np.dot(belief,self.mdp.R[action_tau])) + self.mdp.gamma*self.simulate(s,t+1,belief_after_action,beta)
-            reward += new_r
-        else: 
-            new_r_2 = self.mdp.gamma*(belief_after_action.dot(self.V[:,0,0])) - self.gamma_square_root*beta
-            new_r = np.dot(belief_after_action,np.dot(belief,self.mdp.R[action_tau])) + new_r_2
-            reward += new_r
-        return reward
-
-    def eval_perf(self, n_episodes):
-        tot_r = 0
-        tot_c = 0
-        discounted_r = 0
-        discounted_c = 0
-        for _ in range(n_episodes):
-            s = np.random.randint(self.mdp.N_s)
-            s_last = s
-            t = 0
-            for h in range(self.H):
-                action = self.pi[s_last,t,0]
-                s_next = np.random.choice(self.mdp.N_s, p=self.mdp.P[action,s])
-                tot_r += self.mdp.R[action,s,s_next]
-
-                c_t = self.pi[s_last,t,1]
-                discounted_r = (self.mdp.gamma ** h) * self.mdp.R[action,s,s_next]
-                discounted_c = (self.mdp.gamma ** h) * c_t
-                if h != self.H-1: tot_c += c_t
-                if c_t == 0:
-                    t += 1
-                else:
-                    t = 0
-                    s_last = s_next
-                s = s_next
-        return tot_r/(n_episodes*self.H), tot_c/(n_episodes*self.H), discounted_r/n_episodes, discounted_c/n_episodes
-    
-    def get_PeakAoI(self, target_state: int, n_episodes: int = 1000):
-        tot_r = 0
-        tot_c = 0
-        PAOI = []
-        paoi = 0
-        for _ in range(n_episodes):
-            s = np.random.randint(self.mdp.N_s)
-            s_last = s
-            t = 0
-            if s_last == target_state:
-                paoi = 1
-            else:
-                paoi = 0
-
-            for h in range(self.H):
-                action = self.pi[s_last,t,0]
-                s_next = np.random.choice(self.mdp.N_s, p=self.mdp.P[action,s])
-                tot_r += self.mdp.R[action,s,s_next]
-
-                c_t = self.pi[s_last,t,1]
-                if h != self.H-1: tot_c += c_t
-                if c_t == 0:
-                    t += 1
-                else:
-                    if paoi == 1: PAOI.append(t+1)
-                    t = 0
-                    s_last = s_next
                     
                     if s_last == target_state:
                         paoi = 1
@@ -865,20 +652,15 @@ class PolicyIterationWithSampling(RL_Algorithm):
 
 
 def create_estimation_mdp(gamma: float):
-    R = np.tile(np.expand_dims(np.eye(10), axis=2), (1,1,10))
-    P = np.array( [[0.4, 0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.4, 0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.0, 0.4, 0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.0, 0.0, 0.4, 0.6, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.0, 0.0, 0.0, 0.4, 0.6, 0.0, 0.0, 0.0, 0.0],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.6, 0.0, 0.0, 0.0],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.6, 0.0, 0.0],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.6, 0.0],
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.6],
-                   [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]] )
-    P = np.tile(np.expand_dims(P, axis=0),(10,1,1))
+    R = np.tile(np.expand_dims(np.eye(5), axis=2), (1,1,5))
+    P = np.array( [[0.4, 0.6, 0.0, 0.0, 0.0],
+                   [0.0, 0.4, 0.6, 0.0, 0.0],
+                   [0.0, 0.0, 0.4, 0.6, 0.0],
+                   [0.0, 0.0, 0.0, 0.4, 0.6],
+                   [1.0, 0.0, 0.0, 0.0, 0.0]] )
+    P = np.tile(np.expand_dims(P, axis=0),(5,1,1))
 
-    mdp = MDP(10,10,P,R,gamma)
+    mdp = MDP(5,5,P,R,gamma)
     return [mdp]
 
 
@@ -957,14 +739,14 @@ def create_folder(folder_name):
 
 
 def run_one(p_list):
-    dqn, pomdp, policy_iteration, pull, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder = p_list
+    dqn, pomdp, policy_iteration, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder, upper_bound_init = p_list
 
 
-    # dqn.run(beta, horizon)
-    # tot_reward_dqn, tot_raw_reward_dqn, tot_reward_undiscounted_dqn, tot_raw_reward_undiscounted_dqn, tot_ch_uti_dqn, AoIs_dqn = dqn.eval_perf(horizon, runs_per_instance)
+    dqn.run(beta, horizon)
+    tot_reward_dqn, tot_raw_reward_dqn, tot_reward_undiscounted_dqn, tot_raw_reward_undiscounted_dqn, tot_ch_uti_dqn, AoIs_dqn = dqn.eval_perf(horizon, runs_per_instance)
 
 
-    # pomdp.run(beta)
+    # upper_bound_init = pomdp.run(beta, upper_bound_init)
     # tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, AoIs = pomdp.eval_perf(horizon, runs_per_instance)
     # with open(pomdp.flagdir, "r") as file:
     #     decimal_str = file.readline().strip()
@@ -972,33 +754,23 @@ def run_one(p_list):
 
 
     policy_iteration.run(beta)
-    r,c,discounted_r,discounted_c = policy_iteration.eval_perf(runs_per_instance)
+    r,c,discounted_rminusc = policy_iteration.eval_perf(runs_per_instance)
     aois_policy_iteration = []
     for state in range(mdp.n_states):
         aois_policy_iteration.append(policy_iteration.get_PeakAoI(state, 10))
 
-
-    # pull.run(beta)
-    # r_pull,c_pull,discounted_r,discounted_c = pull.eval_perf(runs_per_instance)
-    # aois_pull = []
-    # for state in range(mdp.n_states):
-    #     aois_pull.append(pull.get_PeakAoI(state, 10))
-
-    # with open("{}/{}_dqn_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
-    #     pickle.dump(AoIs_dqn, f)
+    with open("{}/{}_dqn_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
+        pickle.dump(AoIs_dqn, f)
     # with open("{}/{}_pomdp_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
     #     pickle.dump(AoIs, f)
     with open("{}/{}_politer_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
         pickle.dump(aois_policy_iteration, f)
-    # with open("{}/{}_pull_aoi_{}".format(results_folder,str(mdp_i), beta), 'wb') as f:
-    #     pickle.dump(aois_pull, f)
     with open("{}/{}_results.csv".format(results_folder,str(mdp_i)), mode='a', newline='') as file:
         writer = csv.writer(file)
-        # writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, flag, r, c, discounted_rminusc, r_pull,c_pull,discounted_r,discounted_c])
-        # writer.writerow([tot_reward, tot_raw_reward, tot_reward_undiscounted, tot_raw_reward_undiscounted, tot_ch_uti, flag])
-        writer.writerow([r, c, discounted_r, discounted_c])
+        writer.writerow([tot_reward_dqn, tot_raw_reward_dqn, tot_reward_undiscounted_dqn, tot_raw_reward_undiscounted_dqn, tot_ch_uti_dqn, r, c, discounted_rminusc])
 
-    return None
+    return None #upper_bound_init
+
 
 
 
@@ -1128,25 +900,24 @@ class Deep_RL_Tx:
         self.n_s = n_states
         self.solver_env = solver_env
         self.first = True
-        self.A = solver_env.actions
-
-    def observe(self, s):
-        # set the value of the current underlying state
-        self.s = s     
+        self.A = solver_env.actions 
       
-    def act(self):
-        dec_rule, dec_rule_ind = DQN_get_action(self.model, self.b, self.A)
+    def step(self, s):
+        self.s = s 
 
         if self.first:
             self.first = False
             y = self.s
+            self.b = np.zeros((self.n_s,1))
+            self.b[y] = 1.0
         else:
+            dec_rule, dec_rule_ind = DQN_get_action(self.model, self.b, self.A)
             if dec_rule[self.s] == 1:
                 y = self.s 
             else:
                 y = None
-        # update belief according to observation and action
-        self.b = DQN_agent_update_b(self.b, dec_rule_ind, y, self.n_s, self.solver_env)
+            # update belief according to observation and action
+            self.b = DQN_agent_update_b(self.b, dec_rule_ind, y, self.n_s, self.solver_env)
         return y
 
 
@@ -1158,12 +929,11 @@ class Deep_RL_Rx:
         self.n_s = n_states
         self.solver_env = solver_env
         self.first = True
-
-    def receive_message(self, y):
-        self.y = y
+        self.n_rx_actions = len(self.A) // (2 ** n_states)
     
-    def act(self):
+    def step(self, y):
         #print(dec_rule)
+        self.y = y
         if self.first:
             self.first = False
             self.b = np.zeros((self.n_s,1))
@@ -1172,7 +942,7 @@ class Deep_RL_Rx:
             self.b = DQN_agent_update_b(self.b, self.dec_rule_ind, self.y, self.n_s, self.solver_env)
             
         self.dec_rule, self.dec_rule_ind = DQN_get_action(self.model, self.b, self.A)
-        return self.dec_rule % self.nA
+        return self.dec_rule_ind % self.n_rx_actions
     
 
 
@@ -1222,12 +992,12 @@ class DQN_solver(RL_Algorithm):
                     verbose=0,
                     gamma=self.mdp.gamma)
 
-        model.learn(total_timesteps = 1000000,
+        model.learn(total_timesteps = 5000000,
                     log_interval=4,
                     progress_bar=True,
                     callback=eval_callback)
         
-        model = DQN.load(self.save_path + "best_model")
+        model = DQN.load(self.save_path + "/best_model")
 
         self.Tx = Deep_RL_Tx(model, self.n_states, self.DQN_model)
         self.Rx = Deep_RL_Rx(model, self.n_states, self.DQN_model)
@@ -1319,17 +1089,17 @@ class DQN_solver(RL_Algorithm):
 
 
 if __name__ == "__main__":
-    # Activate the current Julia environment
-    Pkg.activate(".")
+    # # Activate the current Julia environment
+    # Pkg.activate(".")
 
-    # Add or update package dependencies
-    Pkg.add("POMDPs")
-    Pkg.add("POMDPTools")
-    Pkg.add("Distributions")
-    Pkg.add(url="https://github.com/ed13santi/NativeSARSOP.jl")
+    # # Add or update package dependencies
+    # Pkg.add("POMDPs")
+    # Pkg.add("POMDPTools")
+    # Pkg.add("Distributions")
+    # Pkg.add(url="https://github.com/ed13santi/NativeSARSOP.jl")
 
-    # Resolve and instantiate the environment
-    Pkg.instantiate()
+    # # Resolve and instantiate the environment
+    # Pkg.instantiate()
 
 
 
@@ -1346,7 +1116,7 @@ if __name__ == "__main__":
     # horizon = 100
 
     # type of experiment
-    experiment_types = ["push_sparse_reward"]#, "estimation", "push_spread_reward"]
+    experiment_types = ["push_sparse_reward", "push_spread_reward", "estimation"]
 
     params_ll = []
     results_folder_ori = create_folder("10_state_2")
@@ -1362,9 +1132,8 @@ if __name__ == "__main__":
         results_folder = create_folder(f"{results_folder_ori}/{experiment_type}")
 
         # run experiments
-        for mdp_i, mdp in enumerate([mdps[-1]]):
-            np.save("P_Pietro", mdp.P)
-            np.save("R_Pietro", mdp.R)
+        for mdp_i, mdp in enumerate(mdps):
+            upper_bound_init = [[-99999.87654]]
             for beta in betas:
                 assert np.all(np.isclose(np.sum(mdp.P, axis=2), 1.0))
 
@@ -1375,13 +1144,11 @@ if __name__ == "__main__":
                 dqn = DQN_solver(copy.deepcopy(mdp), checkpoint_folder)
                 pomdp = POMDP_solver(copy.deepcopy(mdp), checkpoint_folder)
                 policy_iteration = RemotePolicyIteration(copy.deepcopy(mdp), horizon, tmax)
-                pull = PolicyIterationWithSampling(copy.deepcopy(mdp), horizon, tmax)
 
-                run_one((dqn, pomdp, policy_iteration, pull, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder))
+                params_ll.append((dqn, pomdp, policy_iteration, beta, horizon, tmax, runs_per_instance, mdp_i, results_folder, upper_bound_init))
                 
-    # with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
-    #     _ = list(executor.map(run_one, params_ll))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(run_one, params_ll))
 
-    for el in params_ll:
-        run_one(el)
-
+    # for el in params_ll:
+    #     run_one(el)
