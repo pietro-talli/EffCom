@@ -1,5 +1,5 @@
-# EffCom - Effective Communication
-Algorithms for two agents effective communication problems. 
+# Code for Pragmatic Communication
+Algorithms for two agents effective communication problems. Results presented in [Pragmatic Communication for Remote Control of Finite-State Markov Processes](https://ieeexplore.ieee.org/document/10960335).
 
 ## Description
 The repo is organized as follows:
