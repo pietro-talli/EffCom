@@ -397,6 +397,7 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+all_scripts_and_results/
 results_2_peaks/
 results_estimation_edoardo/
 logs/

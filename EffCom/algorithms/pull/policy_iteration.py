@@ -60,8 +60,8 @@ class PolicyIterationWithSampling(RL_Algorithm):
         while not policy_stable:
             self.policy_evaluation(beta)
             policy_stable = self.policy_improvement(beta)
-            print('Reward and cost: ', self.eval_perf(100))
-            print(np.mean(self.V[:,0,0]))
+            r, c = self.eval_perf(1000)
+            print(i, ',', np.mean(self.V[:,0,0]) * (1-self.mdp.gamma))
             i += 1
             if i == max_iter:
                 break

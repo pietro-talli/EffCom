@@ -51,6 +51,7 @@ class RemotePolicyIteration(RL_Algorithm):
         max_iter = 20
         i = 0
         prev_stable = False
+        counter = 0
         while True:
 
             policy_stable1 = False
@@ -63,9 +64,10 @@ class RemotePolicyIteration(RL_Algorithm):
                 if mean_val_act > np.mean(self.V_actuator):
                     break
                 mean_val_act = np.mean(self.V_actuator)
-                print(mean_val_act)
+                #print(mean_val_act)
 
-            print('actuator done')
+
+            #print('actuator done')
 
             policy_stable2 = False
             mean_val_sensor = 0 
@@ -76,10 +78,11 @@ class RemotePolicyIteration(RL_Algorithm):
                 if mean_val_sensor > np.mean(self.V_sensor):
                     break
                 mean_val_sensor = np.mean(self.V_sensor)
-                print(mean_val_sensor)
-            print('sensor done')
+                print(counter, ',', np.mean(self.V_sensor[:,0,0]) * (1-self.mdp.gamma))
+                counter += 1
+                #print(mean_val_sensor)
+            #print('sensor done')
 
-            print(self.eval_perf(100))
             i += 1
             if i == max_iter:
                 break
