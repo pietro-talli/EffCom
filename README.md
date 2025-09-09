@@ -22,7 +22,7 @@ python main.py \
 --task control \
 --mode MPI \
 --N_states 10 \
---N_actions 2 
+--N_actions 2 \
 --beta 0.1 \
 --n_test_episodes 100
 ```
